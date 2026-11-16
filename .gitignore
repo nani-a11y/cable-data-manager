@@ -1,0 +1,47 @@
+# Environment configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local credentials and key material
+*.pem
+*.key
+*.p12
+*.pfx
+*.credentials
+secrets/
+
+# Local databases and runtime data
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+
+# Customer exports, backups, and data files
+*.csv
+*.xlsx
+*.bak
+*.tar.gz
+*.zip
+backups/
+exports/
+
+# Dependencies, build output, and caches
+node_modules/
+dist/
+coverage/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.tsbuildinfo
+
+# Logs and local editor state
+*.log
+.vscode/*
+!.vscode/tasks.json
+.DS_Store
+Thumbs.db

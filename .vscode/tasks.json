@@ -1,0 +1,54 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Cable Manager: Safe preflight",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/preflight.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Cable Manager: Validate Compose",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/validate-compose.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Cable Manager: Compose status",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/compose-status.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Cable Manager: Health check",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/health-check.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Cable Manager: Dependency check",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/check-dependencies.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Cable Manager: Backend tests",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/test-backend.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Cable Manager: Frontend build",
+      "type": "shell",
+      "command": "npm",
+      "args": ["--prefix", "${workspaceFolder}/frontend", "run", "build"],
+      "problemMatcher": []
+    }
+  ]
+}

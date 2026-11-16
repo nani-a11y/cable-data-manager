@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies (locked)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r backend/requirements-dev.lock
+
+      - name: Run backend tests
+        env:
+          DATABASE_URL: "sqlite:///:memory:"
+          JWT_SECRET: "dummy-ci-jwt-secret-key-at-least-32-chars"
+          ADMIN_EMAIL: "admin@example.com"
+          ADMIN_PASSWORD: "dummy-ci-password"
+        run: |
+          pytest backend/tests -v
+
+      - name: Install frontend dependencies (locked)
+        run: |
+          npm --prefix frontend ci
+
+      - name: Run frontend build and typecheck
+        run: |
+          npm --prefix frontend run build
+
+      - name: Validate Docker Compose configuration
+        run: |
+          cp .env.example .env
+          docker compose config --quiet

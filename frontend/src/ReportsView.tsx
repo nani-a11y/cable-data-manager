@@ -64,7 +64,7 @@ export default function ReportsView({ token }: Props) {
           <h1>Monthly Summary</h1>
           <p className="muted">Track month expected revenue, collections, pending balances, and area registers.</p>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <input
             type="month"
             value={selectedMonth}
@@ -114,7 +114,7 @@ export default function ReportsView({ token }: Props) {
       {/* Filter Toolbar for Customer-Wise Table */}
       <div className="panel" style={{ padding: 16, marginBottom: 20 }}>
         <div style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flex: "1 1 300px" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flex: "1 1 300px", flexWrap: "wrap" }}>
             <div style={{ position: "relative", width: "100%", maxWidth: 320 }}>
               <Search size={18} color="#94a3b8" style={{ position: "absolute", left: 12, top: 11 }} />
               <input

@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import {
   Cable, LayoutDashboard, Users, Wallet,
-  ChartNoAxesCombined, Settings, LogOut, Bell, ShieldCheck,
-  Menu, X, CircleDollarSign, ArrowUpRight, Clock3, BookOpen
+  ChartNoAxesCombined, Settings, LogOut, ShieldCheck,
+  Menu, X, CircleDollarSign, ArrowUpRight, Clock3, BookOpen,
+  MapPin, FileText, Eye, EyeOff
 } from "lucide-react";
 import { getDashboard, login } from "./api";
 import BusinessSetup from "./BusinessSetup";
 import CustomersView from "./CustomersView";
 import PaymentsView from "./PaymentsView";
 import ReportsView from "./ReportsView";
+import BillingView from "./BillingView";
+import AreasView from "./AreasView";
 
 type Summary = {
   total_customers: number;
@@ -18,13 +21,15 @@ type Summary = {
   data_status: string;
 };
 
-type TabType = "Dashboard" | "Collection Register" | "Monthly Summary" | "Payment Log" | "Settings";
+type TabType = "Dashboard" | "Collection Register" | "Billing" | "Monthly Summary" | "Payment Log" | "Service Areas" | "Settings";
 
 const navItems = [
   { id: "Dashboard" as TabType, label: "Dashboard", icon: LayoutDashboard },
   { id: "Collection Register" as TabType, label: "Collection Register", icon: Users },
+  { id: "Billing" as TabType, label: "Billing Management", icon: FileText },
   { id: "Monthly Summary" as TabType, label: "Monthly Summary", icon: ChartNoAxesCombined },
   { id: "Payment Log" as TabType, label: "Payment Log", icon: Wallet },
+  { id: "Service Areas" as TabType, label: "Service Areas", icon: MapPin },
   { id: "Settings" as TabType, label: "Settings", icon: Settings }
 ];
 
@@ -36,6 +41,7 @@ export default function App() {
   const [token, setToken] = useState(localStorage.getItem("cable_token") || "");
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,7 +103,26 @@ export default function App() {
           <label htmlFor="admin-email">Admin email</label>
           <input id="admin-email" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="username" />
           <label htmlFor="admin-password">Password</label>
-          <input id="admin-password" name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
+          <div className="password-input-wrap">
+            <input
+              id="admin-password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="password-toggle-btn"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
           {error && <p className="error">{error}</p>}
           <button className="primary-btn" disabled={loading}>{loading ? "Signing in…" : "Sign in"}</button>
           <p className="login-foot"><ShieldCheck size={15} /> Secure administrator access</p>
@@ -131,13 +156,15 @@ export default function App() {
         <header className="topbar">
           <button className="mobile-menu" onClick={() => setMobileMenu(true)}><Menu size={21}/></button>
           <div className="breadcrumb">Workspace <span>/</span> <strong>{activeTab}</strong></div>
-          <div className="top-actions"><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><span className="top-divider"/><button className="profile-btn" onClick={logout}><span className="avatar">A</span><span className="profile-name">Admin</span><LogOut size={16}/></button></div>
+          <div className="top-actions"><button className="profile-btn" onClick={logout}><span className="avatar">A</span><span className="profile-name">Admin</span><LogOut size={16}/></button></div>
         </header>
 
         {activeTab === "Settings" && <BusinessSetup token={token} />}
         {activeTab === "Collection Register" && <CustomersView token={token} />}
+        {activeTab === "Billing" && <BillingView token={token} />}
         {activeTab === "Payment Log" && <PaymentsView token={token} />}
         {activeTab === "Monthly Summary" && <ReportsView token={token} />}
+        {activeTab === "Service Areas" && <AreasView token={token} />}
 
         {activeTab === "Dashboard" && (
           <section className="content">
@@ -155,26 +182,36 @@ export default function App() {
                 <div className="panel-heading">
                   <div><h2>Quick Actions</h2><p className="muted">Direct operator shortcuts</p></div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, padding: 16 }}>
-                  <button onClick={() => setActiveTab("Collection Register")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                    <Users size={24} color="#0284c7" />
+                <div className="quick-actions-grid">
+                  <button onClick={() => setActiveTab("Collection Register")} className="secondary-btn quick-action-tile">
+                    <Users size={24} className="icon-sky" />
                     <strong>Collection Register</strong>
-                    <small style={{ color: "#64748b" }}>Collect dues, view khata, and manage subscribers</small>
+                    <small>Collect dues, view khata, and manage subscribers</small>
                   </button>
-                  <button onClick={() => setActiveTab("Monthly Summary")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                    <ChartNoAxesCombined size={24} color="#16a34a" />
+                  <button onClick={() => setActiveTab("Billing")} className="secondary-btn quick-action-tile">
+                    <FileText size={24} className="icon-cyan" />
+                    <strong>Billing Management</strong>
+                    <small>Monthly invoice cycle & overdue catch-up</small>
+                  </button>
+                  <button onClick={() => setActiveTab("Monthly Summary")} className="secondary-btn quick-action-tile">
+                    <ChartNoAxesCombined size={24} className="icon-green" />
                     <strong>Monthly Summary</strong>
-                    <small style={{ color: "#64748b" }}>Area-wise collection sheet & print register</small>
+                    <small>Area-wise collection sheet & print register</small>
                   </button>
-                  <button onClick={() => setActiveTab("Payment Log")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                    <Wallet size={24} color="#d97706" />
+                  <button onClick={() => setActiveTab("Payment Log")} className="secondary-btn quick-action-tile">
+                    <Wallet size={24} className="icon-amber" />
                     <strong>Payment Log</strong>
-                    <small style={{ color: "#64748b" }}>Receipts, notes, and audit reversals</small>
+                    <small>Receipts, notes, and audit reversals</small>
                   </button>
-                  <button onClick={() => setActiveTab("Settings")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
-                    <Settings size={24} color="#8b5cf6" />
+                  <button onClick={() => setActiveTab("Service Areas")} className="secondary-btn quick-action-tile">
+                    <MapPin size={24} className="icon-rose" />
+                    <strong>Service Areas</strong>
+                    <small>Add zones and update area subscriber rates</small>
+                  </button>
+                  <button onClick={() => setActiveTab("Settings")} className="secondary-btn quick-action-tile">
+                    <Settings size={24} className="icon-purple" />
                     <strong>Settings</strong>
-                    <small style={{ color: "#64748b" }}>Service areas, default rate & business profile</small>
+                    <small>Service areas, default rate & business profile</small>
                   </button>
                 </div>
               </section>

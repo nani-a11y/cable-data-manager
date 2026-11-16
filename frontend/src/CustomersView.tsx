@@ -282,107 +282,195 @@ export default function CustomersView({ token }: Props) {
             <p>No subscribers found matching your query.</p>
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="data-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc", textAlign: "left", borderBottom: "1px solid #e2e8f0" }}>
-                  <th style={{ padding: "12px 16px" }}>Subscriber</th>
-                  <th style={{ padding: "12px 16px" }}>Box No</th>
-                  <th style={{ padding: "12px 16px" }}>Area</th>
-                  <th style={{ padding: "12px 16px" }}>Rate</th>
-                  <th style={{ padding: "12px 16px" }}>Current Balance</th>
-                  <th style={{ padding: "12px 16px", textAlign: "right" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedCustomers.map((c) => {
-                  const due = parseFloat(c.current_outstanding_balance || "0");
-                  const advance = parseFloat(c.advance_credit || "0");
+          <>
+            {/* Desktop Table View */}
+            <div className="desktop-table-container">
+              <table className="data-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc", textAlign: "left", borderBottom: "1px solid #e2e8f0" }}>
+                    <th style={{ padding: "12px 16px" }}>Subscriber</th>
+                    <th style={{ padding: "12px 16px" }}>Box No</th>
+                    <th style={{ padding: "12px 16px" }}>Area</th>
+                    <th style={{ padding: "12px 16px" }}>Rate</th>
+                    <th style={{ padding: "12px 16px" }}>Current Balance</th>
+                    <th style={{ padding: "12px 16px", textAlign: "right" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedCustomers.map((c) => {
+                    const due = parseFloat(c.current_outstanding_balance || "0");
+                    const advance = parseFloat(c.advance_credit || "0");
 
-                  return (
-                    <tr key={c.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                      <td style={{ padding: "12px 16px" }}>
+                    return (
+                      <tr key={c.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <strong>{c.name}</strong>
+                            {!c.is_active && <span className="status-pill status-inactive">Inactive</span>}
+                          </div>
+                          <div style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
+                            <Phone size={12} /> {c.phone} · <span style={{ fontFamily: "monospace" }}>{c.display_id}</span>
+                          </div>
+                        </td>
+
+                        <td style={{ padding: "12px 16px" }}>
+                          <span style={{ fontWeight: 600, fontFamily: "monospace", background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>
+                            {c.box_number}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: "12px 16px", color: "#475569" }}>
+                          {c.area}
+                        </td>
+
+                        <td style={{ padding: "12px 16px", fontWeight: 600 }}>
+                          ₹{c.monthly_amount}
+                        </td>
+
+                        <td style={{ padding: "12px 16px" }}>
+                          {due > 0 ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#dc2626", fontWeight: 700 }}>
+                              <TrendingDown size={16} /> Due: ₹{c.current_outstanding_balance}
+                            </div>
+                          ) : advance > 0 ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#0284c7", fontWeight: 700 }}>
+                              <TrendingUp size={16} /> Advance: ₹{c.advance_credit}
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#16a34a", fontWeight: 700 }}>
+                              <CheckCircle size={16} /> Paid / Clear
+                            </div>
+                          )}
+                        </td>
+
+                        <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                          <div style={{ display: "inline-flex", gap: 8 }}>
+                            <button
+                              onClick={() => handleOpenCollect(c)}
+                              className="primary-btn"
+                              style={{ padding: "6px 12px", fontSize: 13, background: "#16a34a", borderColor: "#16a34a", display: "flex", alignItems: "center", gap: 4 }}
+                            >
+                              <CreditCard size={14} /> Collect
+                            </button>
+                            <button
+                              onClick={() => handleOpenKhata(c)}
+                              className="secondary-btn"
+                              style={{ padding: "6px 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}
+                              title="View Customer Passbook"
+                            >
+                              <BookOpen size={14} /> Khata
+                            </button>
+                            <button
+                              onClick={() => handleOpenEdit(c)}
+                              className="secondary-btn"
+                              style={{ padding: "6px 10px", fontSize: 13 }}
+                            >
+                              Edit
+                            </button>
+                            {c.is_active && (
+                              <button
+                                onClick={() => handleDeactivate(c)}
+                                className="secondary-btn"
+                                style={{ padding: "6px 8px", fontSize: 13, color: "#dc2626" }}
+                                title="Deactivate Subscriber"
+                              >
+                                X
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Customer Cards View */}
+            <div className="mobile-cards-container">
+              {displayedCustomers.map((c) => {
+                const due = parseFloat(c.current_outstanding_balance || "0");
+                const advance = parseFloat(c.advance_credit || "0");
+
+                return (
+                  <article key={c.id} className="customer-mobile-card">
+                    <div className="customer-mobile-card-header">
+                      <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <strong>{c.name}</strong>
+                          <strong style={{ fontSize: 15, color: "#0f172a" }}>{c.name}</strong>
                           {!c.is_active && <span className="status-pill status-inactive">Inactive</span>}
                         </div>
-                        <div style={{ fontSize: 13, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
+                        <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
                           <Phone size={12} /> {c.phone} · <span style={{ fontFamily: "monospace" }}>{c.display_id}</span>
                         </div>
-                      </td>
+                      </div>
+                      <span style={{ fontWeight: 600, fontFamily: "monospace", background: "#f1f5f9", padding: "3px 8px", borderRadius: 6, fontSize: 12 }}>
+                        {c.box_number}
+                      </span>
+                    </div>
 
-                      <td style={{ padding: "12px 16px" }}>
-                        <span style={{ fontWeight: 600, fontFamily: "monospace", background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>
-                          {c.box_number}
-                        </span>
-                      </td>
-
-                      <td style={{ padding: "12px 16px", color: "#475569" }}>
-                        {c.area}
-                      </td>
-
-                      <td style={{ padding: "12px 16px", fontWeight: 600 }}>
-                        ₹{c.monthly_amount}
-                      </td>
-
-                      <td style={{ padding: "12px 16px" }}>
+                    <div className="customer-mobile-card-body">
+                      <div>
+                        <span style={{ color: "#64748b", display: "block", fontSize: 11 }}>Area & Rate</span>
+                        <strong style={{ color: "#334155" }}>{c.area} · ₹{c.monthly_amount}/mo</strong>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ color: "#64748b", display: "block", fontSize: 11 }}>Balance</span>
                         {due > 0 ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#dc2626", fontWeight: 700 }}>
-                            <TrendingDown size={16} /> Due: ₹{c.current_outstanding_balance}
-                          </div>
+                          <span style={{ color: "#dc2626", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <TrendingDown size={14} /> Due: ₹{c.current_outstanding_balance}
+                          </span>
                         ) : advance > 0 ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#0284c7", fontWeight: 700 }}>
-                            <TrendingUp size={16} /> Advance: ₹{c.advance_credit}
-                          </div>
+                          <span style={{ color: "#0284c7", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <TrendingUp size={14} /> Adv: ₹{c.advance_credit}
+                          </span>
                         ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#16a34a", fontWeight: 700 }}>
-                            <CheckCircle size={16} /> Paid / Clear
-                          </div>
+                          <span style={{ color: "#16a34a", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <CheckCircle size={14} /> Paid / Clear
+                          </span>
                         )}
-                      </td>
+                      </div>
+                    </div>
 
-                      <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: 8 }}>
-                          <button
-                            onClick={() => handleOpenCollect(c)}
-                            className="primary-btn"
-                            style={{ padding: "6px 12px", fontSize: 13, background: "#16a34a", borderColor: "#16a34a", display: "flex", alignItems: "center", gap: 4 }}
-                          >
-                            <CreditCard size={14} /> Collect
-                          </button>
-                          <button
-                            onClick={() => handleOpenKhata(c)}
-                            className="secondary-btn"
-                            style={{ padding: "6px 10px", fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}
-                            title="View Customer Passbook"
-                          >
-                            <BookOpen size={14} /> Khata
-                          </button>
-                          <button
-                            onClick={() => handleOpenEdit(c)}
-                            className="secondary-btn"
-                            style={{ padding: "6px 10px", fontSize: 13 }}
-                          >
-                            Edit
-                          </button>
-                          {c.is_active && (
-                            <button
-                              onClick={() => handleDeactivate(c)}
-                              className="secondary-btn"
-                              style={{ padding: "6px 8px", fontSize: 13, color: "#dc2626" }}
-                              title="Deactivate Subscriber"
-                            >
-                              X
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    <div className="customer-mobile-card-actions">
+                      <button
+                        onClick={() => handleOpenCollect(c)}
+                        className="primary-btn"
+                        style={{ flex: 1, padding: "8px 12px", fontSize: 13, background: "#16a34a", borderColor: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                      >
+                        <CreditCard size={15} /> Collect
+                      </button>
+                      <button
+                        onClick={() => handleOpenKhata(c)}
+                        className="secondary-btn"
+                        style={{ padding: "8px 12px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}
+                        title="View Customer Passbook"
+                      >
+                        <BookOpen size={15} /> Khata
+                      </button>
+                      <button
+                        onClick={() => handleOpenEdit(c)}
+                        className="secondary-btn"
+                        style={{ padding: "8px 12px", fontSize: 13 }}
+                      >
+                        Edit
+                      </button>
+                      {c.is_active && (
+                        <button
+                          onClick={() => handleDeactivate(c)}
+                          className="secondary-btn"
+                          style={{ padding: "8px 10px", fontSize: 13, color: "#dc2626" }}
+                          title="Deactivate Subscriber"
+                        >
+                          X
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )}
 
         {/* Pagination Bar */}

@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import {
-  Cable, LayoutDashboard, Users, Wallet, MapPin, FileSpreadsheet,
+  Cable, LayoutDashboard, Users, Wallet,
   ChartNoAxesCombined, Settings, LogOut, Bell, ShieldCheck,
-  Menu, X, CircleDollarSign, ArrowUpRight, Clock3
+  Menu, X, CircleDollarSign, ArrowUpRight, Clock3, BookOpen
 } from "lucide-react";
 import { getDashboard, login } from "./api";
 import BusinessSetup from "./BusinessSetup";
+import CustomersView from "./CustomersView";
+import PaymentsView from "./PaymentsView";
+import ReportsView from "./ReportsView";
 
 type Summary = {
   total_customers: number;
@@ -15,14 +18,14 @@ type Summary = {
   data_status: string;
 };
 
+type TabType = "Dashboard" | "Collection Register" | "Monthly Summary" | "Payment Log" | "Settings";
+
 const navItems = [
-  { id: "Dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "Customers", label: "Customers", icon: Users },
-  { id: "Payments", label: "Payments", icon: Wallet },
-  { id: "Areas", label: "Areas", icon: MapPin },
-  { id: "Excel Import", label: "Excel Import", icon: FileSpreadsheet },
-  { id: "Reports", label: "Reports", icon: ChartNoAxesCombined },
-  { id: "Settings", label: "Settings", icon: Settings }
+  { id: "Dashboard" as TabType, label: "Dashboard", icon: LayoutDashboard },
+  { id: "Collection Register" as TabType, label: "Collection Register", icon: Users },
+  { id: "Monthly Summary" as TabType, label: "Monthly Summary", icon: ChartNoAxesCombined },
+  { id: "Payment Log" as TabType, label: "Payment Log", icon: Wallet },
+  { id: "Settings" as TabType, label: "Settings", icon: Settings }
 ];
 
 function money(value: number) {
@@ -37,7 +40,7 @@ export default function App() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState<"Dashboard" | "Settings">("Dashboard");
+  const [activeTab, setActiveTab] = useState<TabType>("Dashboard");
 
   useEffect(() => {
     if (!token) return;
@@ -45,7 +48,7 @@ export default function App() {
       localStorage.removeItem("cable_token");
       setToken("");
     });
-  }, [token]);
+  }, [token, activeTab]);
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -115,12 +118,8 @@ export default function App() {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return <button key={item.label} className={`nav-item ${isActive ? "active" : ""}`} onClick={() => {
-            if (item.id === "Dashboard" || item.id === "Settings") {
-              setActiveTab(item.id as "Dashboard" | "Settings");
-              setMobileMenu(false);
-            } else {
-              alert(`${item.label} will be implemented in the next phase.`);
-            }
+            setActiveTab(item.id);
+            setMobileMenu(false);
           }}>
             <Icon size={18}/><span>{item.label}</span>{isActive && <span className="active-dot"/>}
           </button>;
@@ -135,35 +134,62 @@ export default function App() {
           <div className="top-actions"><button className="icon-btn" aria-label="Notifications"><Bell size={18}/></button><span className="top-divider"/><button className="profile-btn" onClick={logout}><span className="avatar">A</span><span className="profile-name">Admin</span><LogOut size={16}/></button></div>
         </header>
 
-        {activeTab === "Settings" ? (
-          <BusinessSetup token={token} />
-        ) : (
-          <section className="content">
-            <div className="welcome-row"><div><p className="eyebrow">OVERVIEW</p><h1>Dashboard</h1><p className="muted">Your cable business at a glance.</p></div><div className="date-pill"><Clock3 size={15}/> {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div></div>
+        {activeTab === "Settings" && <BusinessSetup token={token} />}
+        {activeTab === "Collection Register" && <CustomersView token={token} />}
+        {activeTab === "Payment Log" && <PaymentsView token={token} />}
+        {activeTab === "Monthly Summary" && <ReportsView token={token} />}
 
-            <div className="notice"><ShieldCheck size={18}/><div><strong>Phase 1 foundation is ready</strong><p>Admin authentication and cloud database connection are configured. Configure business settings or import customer records to activate live business metrics.</p></div></div>
+        {activeTab === "Dashboard" && (
+          <section className="content">
+            <div className="welcome-row"><div><p className="eyebrow">COLLECTION REGISTER</p><h1>Operator Dashboard</h1><p className="muted">Your local cable TV subscription and collection ledger.</p></div><div className="date-pill"><Clock3 size={15}/> {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div></div>
 
             <div className="stats-grid">
-              <Stat title="Total customers" value={summary ? String(summary.total_customers) : "—"} icon={<Users/>} note="Customer records will appear after import"/>
-              <Stat title="Expected collection" value={summary ? money(summary.expected_collection) : "—"} icon={<CircleDollarSign/>} note="Monthly billing total"/>
-              <Stat title="Collected this month" value={summary ? money(summary.collected) : "—"} icon={<Wallet/>} note="Confirmed payments only" positive/>
-              <Stat title="Outstanding balance" value={summary ? money(summary.outstanding) : "—"} icon={<ArrowUpRight/>} note="Unpaid and partial balances"/>
+              <Stat title="Total active subscribers" value={summary ? String(summary.total_customers) : "—"} icon={<Users/>} note="Registered active boxes"/>
+              <Stat title="Expected dues" value={summary ? money(summary.expected_collection) : "—"} icon={<CircleDollarSign/>} note="Current month dues"/>
+              <Stat title="Collected this month" value={summary ? money(summary.collected) : "—"} icon={<Wallet/>} note="Confirmed cash & UPI" positive/>
+              <Stat title="Pending balance" value={summary ? money(summary.outstanding) : "—"} icon={<ArrowUpRight/>} note="Total outstanding balance"/>
             </div>
 
             <div className="lower-grid">
-              <section className="panel collection-panel"><div className="panel-heading"><div><h2>Monthly collection</h2><p className="muted">Payment progress for the selected month</p></div><span className="tag">Live data pending</span></div>
-                <div className="empty-chart"><div className="empty-icon"><ChartNoAxesCombined size={28}/></div><strong>Collection chart will appear here</strong><p>Once customer bills and payments are added, this chart will show collected vs. outstanding amounts.</p></div>
+              <section className="panel collection-panel">
+                <div className="panel-heading">
+                  <div><h2>Quick Actions</h2><p className="muted">Direct operator shortcuts</p></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, padding: 16 }}>
+                  <button onClick={() => setActiveTab("Collection Register")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                    <Users size={24} color="#0284c7" />
+                    <strong>Collection Register</strong>
+                    <small style={{ color: "#64748b" }}>Collect dues, view khata, and manage subscribers</small>
+                  </button>
+                  <button onClick={() => setActiveTab("Monthly Summary")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                    <ChartNoAxesCombined size={24} color="#16a34a" />
+                    <strong>Monthly Summary</strong>
+                    <small style={{ color: "#64748b" }}>Area-wise collection sheet & print register</small>
+                  </button>
+                  <button onClick={() => setActiveTab("Payment Log")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                    <Wallet size={24} color="#d97706" />
+                    <strong>Payment Log</strong>
+                    <small style={{ color: "#64748b" }}>Receipts, notes, and audit reversals</small>
+                  </button>
+                  <button onClick={() => setActiveTab("Settings")} className="secondary-btn" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                    <Settings size={24} color="#8b5cf6" />
+                    <strong>Settings</strong>
+                    <small style={{ color: "#64748b" }}>Service areas, default rate & business profile</small>
+                  </button>
+                </div>
               </section>
-              <section className="panel"><div className="panel-heading"><div><h2>Quick overview</h2><p className="muted">Your workspace modules</p></div></div>
+
+              <section className="panel">
+                <div className="panel-heading"><div><h2>Register Status</h2><p className="muted">System health</p></div></div>
                 <div className="module-list">
-                  <Module icon={<Users/>} title="Customer directory" desc="Search and manage customers" status="Phase 3"/>
-                  <Module icon={<Wallet/>} title="Payment tracking" desc="Full and partial payments" status="Phase 4"/>
-                  <Module icon={<FileSpreadsheet/>} title="Excel import" desc="Bring in existing records" status="Phase 2"/>
-                  <Module icon={<Settings/>} title="Admin settings" desc="Default and custom pricing" status="Configure" onClick={() => setActiveTab("Settings")}/>
+                  <Module icon={<Users/>} title="Subscriber Register" desc="Active boxes & live balance" status="Ready" onClick={() => setActiveTab("Collection Register")} />
+                  <Module icon={<BookOpen/>} title="Customer Khata" desc="Chronological passbook statements" status="Ready" onClick={() => setActiveTab("Collection Register")} />
+                  <Module icon={<Wallet/>} title="Payment Receipts" desc="Cash & UPI manual recording" status="Ready" onClick={() => setActiveTab("Payment Log")} />
+                  <Module icon={<Settings/>} title="Business Rules" desc="Service areas & rates" status="Ready" onClick={() => setActiveTab("Settings")} />
                 </div>
               </section>
             </div>
-            <footer>© {new Date().getFullYear()} Cable Manager <span>Secure business workspace</span></footer>
+            <footer>© {new Date().getFullYear()} Cable Manager <span>Offline collection register for local cable operators</span></footer>
           </section>
         )}
       </main>
@@ -185,8 +211,7 @@ function Module({ icon, title, desc, status, onClick }: { icon: React.ReactNode;
     >
       <span className="module-icon">{icon}</span>
       <div className="module-copy"><strong>{title}</strong><small>{desc}</small></div>
-      <span className="phase-tag">{status}</span>
+      <span className="phase-tag" style={{ background: "#dcfce7", color: "#166534" }}>{status}</span>
     </div>
   );
 }
-

@@ -1,16 +1,18 @@
 import math
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 
 from ..database import get_db
-from ..models import AdminUser, BusinessSettings, Customer
+from ..models import AdminUser, BusinessSettings, Customer, Invoice, Payment, PaymentAllocation
 from ..schemas import (
     CustomerCreate,
     CustomerUpdate,
     CustomerResponse,
     CustomerPagination,
+    CustomerFinancialHistoryResponse,
 )
 from .auth import get_current_admin
 
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/api/customers", tags=["customers"])
 
 def _generate_next_display_id(db: Session) -> str:
     """Generate display_id like 'C-0001', 'C-0002' safely under concurrency.
-    
+
     Extracts the highest existing sequence number from display_id strings.
     """
     display_ids = db.query(Customer.display_id).all()
@@ -49,7 +51,7 @@ def _validate_service_area(area: str, db: Session) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Business configuration is missing. Configure service areas in settings first.",
         )
-    
+
     # Extract service areas list
     service_areas = settings.service_areas
     # service_areas can be a list of strings or list of dicts {"name": ..., "is_active": ...}
@@ -61,7 +63,7 @@ def _validate_service_area(area: str, db: Session) -> str:
             # If dict, only consider if active (defaults to True if not specified)
             if item.get("is_active", True):
                 valid_names.add(item["name"].strip().lower())
-    
+
     area_clean = area.strip()
     if area_clean.lower() not in valid_names:
         raise HTTPException(
@@ -183,6 +185,51 @@ def list_customers(
     # Order by display_id asc
     items = query.order_by(Customer.id.asc()).offset(offset).limit(page_size).all()
 
+    # Annotate with outstanding balance and advance credit efficiently
+    if items:
+        cust_ids = [c.id for c in items]
+
+        # 1. Outstanding invoice dues per customer: sum(amount - paid_amount)
+        invoice_rows = (
+            db.query(
+                Invoice.customer_id,
+                func.coalesce(func.sum(Invoice.amount - Invoice.paid_amount), Decimal("0.00")),
+            )
+            .filter(Invoice.customer_id.in_(cust_ids))
+            .group_by(Invoice.customer_id)
+            .all()
+        )
+        dues_map = {cid: val for cid, val in invoice_rows}
+
+        # 2. Advance credit = (Total valid payments) - (Total allocations on non-reversed payments)
+        paid_rows = (
+            db.query(
+                Payment.customer_id,
+                func.coalesce(func.sum(Payment.amount), Decimal("0.00")),
+            )
+            .filter(Payment.customer_id.in_(cust_ids), Payment.is_reversed == False)
+            .group_by(Payment.customer_id)
+            .all()
+        )
+        paid_map = {cid: val for cid, val in paid_rows}
+
+        alloc_rows = (
+            db.query(
+                Payment.customer_id,
+                func.coalesce(func.sum(PaymentAllocation.allocated_amount), Decimal("0.00")),
+            )
+            .join(Payment, PaymentAllocation.payment_id == Payment.id)
+            .filter(Payment.customer_id.in_(cust_ids), Payment.is_reversed == False)
+            .group_by(Payment.customer_id)
+            .all()
+        )
+        alloc_map = {cid: val for cid, val in alloc_rows}
+
+        for c in items:
+            c.current_outstanding_balance = dues_map.get(c.id, Decimal("0.00"))
+            credit = paid_map.get(c.id, Decimal("0.00")) - alloc_map.get(c.id, Decimal("0.00"))
+            c.advance_credit = credit if credit > Decimal("0.00") else Decimal("0.00")
+
     return CustomerPagination(
         items=items,
         total=total,
@@ -205,7 +252,143 @@ def get_customer(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Customer with ID {customer_id} not found",
         )
+    # Annotate balance and credit
+    inv_due = (
+        db.query(func.coalesce(func.sum(Invoice.amount - Invoice.paid_amount), Decimal("0.00")))
+        .filter(Invoice.customer_id == customer_id)
+        .scalar()
+    )
+    total_valid_paid = (
+        db.query(func.coalesce(func.sum(Payment.amount), Decimal("0.00")))
+        .filter(Payment.customer_id == customer_id, Payment.is_reversed == False)
+        .scalar()
+    )
+    total_alloc = (
+        db.query(func.coalesce(func.sum(PaymentAllocation.allocated_amount), Decimal("0.00")))
+        .join(Payment, PaymentAllocation.payment_id == Payment.id)
+        .filter(Payment.customer_id == customer_id, Payment.is_reversed == False)
+        .scalar()
+    )
+    customer.current_outstanding_balance = inv_due
+    credit = total_valid_paid - total_alloc
+    customer.advance_credit = credit if credit > Decimal("0.00") else Decimal("0.00")
     return customer
+
+
+@router.get("/{customer_id}/history", response_model=CustomerFinancialHistoryResponse)
+def get_customer_financial_history(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin),
+):
+    """Retrieve full chronological invoices and payment history for a customer."""
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Customer with ID {customer_id} not found",
+        )
+
+    invoices = (
+        db.query(Invoice)
+        .filter(Invoice.customer_id == customer_id)
+        .order_by(Invoice.billing_month.desc(), Invoice.id.desc())
+        .all()
+    )
+    payments = (
+        db.query(Payment)
+        .filter(Payment.customer_id == customer_id)
+        .order_by(Payment.paid_date.desc(), Payment.id.desc())
+        .all()
+    )
+
+    from decimal import Decimal
+    total_invoiced = sum((inv.amount for inv in invoices), Decimal("0.00"))
+    total_invoice_paid = sum((inv.paid_amount for inv in invoices), Decimal("0.00"))
+    outstanding = total_invoiced - total_invoice_paid
+
+    total_valid_payments = sum((p.amount for p in payments if not p.is_reversed), Decimal("0.00"))
+    # Advance credit = valid payments - total allocations
+    total_allocated = (
+        db.query(func.coalesce(func.sum(PaymentAllocation.allocated_amount), Decimal("0.00")))
+        .join(Payment, PaymentAllocation.payment_id == Payment.id)
+        .filter(Payment.customer_id == customer_id, Payment.is_reversed == False)
+        .scalar()
+    )
+    advance_credit = total_valid_payments - total_allocated
+    if advance_credit < Decimal("0.00"):
+        advance_credit = Decimal("0.00")
+
+    # Annotate customer object
+    customer.current_outstanding_balance = outstanding
+    customer.advance_credit = advance_credit
+
+    # Build chronological passbook / ledger entries (sorted by date asc, id asc)
+    # Events:
+    # 1. Invoice created -> date = issued_date, type = "charge", description = f"Monthly Due ({inv.billing_month})"
+    # 2. Payment received -> date = paid_date, type = "payment", description = f"Payment Received ({pay.payment_method.upper()} - {pay.receipt_number})"
+    # 3. Payment reversed -> date = reversed_at.date(), type = "reversal", description = f"Payment Reversal ({pay.receipt_number} - {pay.reversal_reason})"
+    raw_events = []
+    for inv in invoices:
+        raw_events.append({
+            "date": inv.issued_date,
+            "created_at": inv.created_at,
+            "sort_key": (inv.issued_date, 0, inv.id),
+            "entry_type": "charge",
+            "description": f"Monthly Charge ({inv.billing_month})",
+            "charge_amount": inv.amount,
+            "payment_amount": Decimal("0.00"),
+        })
+
+    for pay in payments:
+        raw_events.append({
+            "date": pay.paid_date,
+            "created_at": pay.created_at,
+            "sort_key": (pay.paid_date, 1, pay.id),
+            "entry_type": "payment",
+            "description": f"Payment Received ({pay.payment_method.upper()}) [Ref: {pay.receipt_number}]",
+            "charge_amount": Decimal("0.00"),
+            "payment_amount": pay.amount,
+        })
+        if pay.is_reversed:
+            rev_date = pay.reversed_at.date() if pay.reversed_at else pay.paid_date
+            raw_events.append({
+                "date": rev_date,
+                "created_at": pay.reversed_at or pay.created_at,
+                "sort_key": (rev_date, 2, pay.id),
+                "entry_type": "reversal",
+                "description": f"Reversal: {pay.receipt_number} ({pay.reversal_reason or 'No reason provided'})",
+                "charge_amount": pay.amount,
+                "payment_amount": Decimal("0.00"),
+            })
+
+    # Sort events chronologically (oldest to newest)
+    raw_events.sort(key=lambda x: x["sort_key"])
+
+    running_bal = Decimal("0.00")
+    ledger_entries = []
+    for ev in raw_events:
+        running_bal += ev["charge_amount"]
+        running_bal -= ev["payment_amount"]
+        ledger_entries.append({
+            "date": ev["date"],
+            "entry_type": ev["entry_type"],
+            "description": ev["description"],
+            "charge_amount": ev["charge_amount"],
+            "payment_amount": ev["payment_amount"],
+            "running_balance": running_bal,
+        })
+
+    return CustomerFinancialHistoryResponse(
+        customer=customer,
+        total_invoiced=f"{total_invoiced:.2f}",
+        total_paid=f"{total_valid_payments:.2f}",
+        outstanding_balance=f"{outstanding:.2f}",
+        advance_credit=f"{advance_credit:.2f}",
+        invoices=invoices,
+        payments=payments,
+        ledger=ledger_entries,
+    )
 
 
 @router.patch("/{customer_id}", response_model=CustomerResponse)
@@ -281,7 +464,7 @@ def deactivate_customer(
     current_admin: AdminUser = Depends(get_current_admin),
 ):
     """Soft-delete / deactivate a customer. Sets is_active = False.
-    
+
     Never deletes customer record or associated invoices/payments from the database.
     """
     customer = db.query(Customer).filter(Customer.id == customer_id).first()

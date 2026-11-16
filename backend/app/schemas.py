@@ -36,7 +36,7 @@ class BusinessSettingsBase(BaseModel):
     contact_number: str
     email: EmailStr | None = None
     address: str | None = None
-    service_areas: list[str]
+    service_areas: list[str | dict]
     currency_code: str = "INR"
     timezone: str = "Asia/Kolkata"
     default_monthly_amount: Decimal = Decimal("300.00")
@@ -81,20 +81,33 @@ class BusinessSettingsBase(BaseModel):
 
     @field_validator("service_areas")
     @classmethod
-    def validate_service_areas(cls, v: list[str]) -> list[str]:
+    def validate_service_areas(cls, v: list[str | dict]) -> list[str | dict]:
         if not v:
             raise ValueError("At least one service area is required")
-        cleaned: list[str] = []
+        cleaned: list[str | dict] = []
         seen = set()
         for item in v:
-            trimmed = item.strip()
-            if not trimmed:
-                raise ValueError("Service area name cannot be empty")
-            lower = trimmed.lower()
-            if lower in seen:
-                raise ValueError(f"Duplicate service area: '{trimmed}'")
-            seen.add(lower)
-            cleaned.append(trimmed)
+            if isinstance(item, str):
+                trimmed = item.strip()
+                if not trimmed:
+                    raise ValueError("Service area name cannot be empty")
+                lower = trimmed.lower()
+                if lower in seen:
+                    raise ValueError(f"Duplicate service area: '{trimmed}'")
+                seen.add(lower)
+                cleaned.append(trimmed)
+            elif isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+                if not name:
+                    raise ValueError("Service area name cannot be empty")
+                lower = name.lower()
+                if lower in seen:
+                    raise ValueError(f"Duplicate service area: '{name}'")
+                seen.add(lower)
+                is_active = bool(item.get("is_active", True))
+                cleaned.append({"name": name, "is_active": is_active})
+            else:
+                raise ValueError("Invalid service area format")
         return cleaned
 
     @field_validator("currency_code")
@@ -193,7 +206,7 @@ class BusinessSettingsUpdate(BaseModel):
 
     @field_validator("service_areas")
     @classmethod
-    def validate_service_areas(cls, v: list[str] | None) -> list[str] | None:
+    def validate_service_areas(cls, v: list[str | dict] | None) -> list[str | dict] | None:
         if v is not None:
             return BusinessSettingsBase.validate_service_areas(v)
         return None
@@ -251,6 +264,73 @@ class BusinessSettingsResponse(BusinessSettingsBase):
         return f"{val:.2f}"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- Area & Bulk Subscription Management Schemas ---
+
+class AreaCreatePayload(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError("Area name cannot be empty")
+        if len(trimmed) > 100:
+            raise ValueError("Area name must not exceed 100 characters")
+        return trimmed
+
+
+class AreaRenamePayload(BaseModel):
+    old_name: str
+    new_name: str
+
+    @field_validator("old_name", "new_name")
+    @classmethod
+    def validate_names(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError("Area name cannot be empty")
+        if len(trimmed) > 100:
+            raise ValueError("Area name must not exceed 100 characters")
+        return trimmed
+
+
+class AreaArchivePayload(BaseModel):
+    name: str
+    is_active: bool = False
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError("Area name cannot be empty")
+        return trimmed
+
+
+class BulkRateUpdatePayload(BaseModel):
+    new_monthly_amount: Decimal
+    confirm: bool
+
+    @field_validator("new_monthly_amount")
+    @classmethod
+    def validate_amount(cls, v: Decimal) -> Decimal:
+        if v <= Decimal("0"):
+            raise ValueError("New monthly subscription amount must be greater than 0")
+        if v > Decimal("9999999999.99"):
+            raise ValueError("Amount exceeds maximum allowed limit")
+        exponent = v.as_tuple().exponent
+        if isinstance(exponent, int) and exponent < -2:
+            raise ValueError("Amount cannot have more than 2 decimal places")
+        return v.quantize(Decimal("0.01"))
+
+
+class BulkRateUpdateResponse(BaseModel):
+    affected_customers_count: int
+    new_monthly_amount: str
+    message: str
 
 
 # --- Customer Schemas ---
@@ -377,11 +457,21 @@ class CustomerResponse(BaseModel):
     area: str
     monthly_amount: Decimal
     is_active: bool
+    current_outstanding_balance: Decimal = Decimal("0.00")
+    advance_credit: Decimal = Decimal("0.00")
     created_at: datetime
     updated_at: datetime
 
     @field_serializer("monthly_amount")
     def serialize_monthly_amount(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    @field_serializer("current_outstanding_balance")
+    def serialize_current_outstanding_balance(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    @field_serializer("advance_credit")
+    def serialize_advance_credit(self, val: Decimal) -> str:
         return f"{val:.2f}"
 
     model_config = ConfigDict(from_attributes=True)
@@ -395,6 +485,19 @@ class CustomerPagination(BaseModel):
     total_pages: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MonthlyReviewMetrics(BaseModel):
+    billing_month: str
+    is_invoice_backed: bool
+    estimated_amount: str
+    amount_collected: str
+    pending_amount: str
+    collection_percentage: float
+    older_arrears: str
+    advance_credit: str
+    total_active_customers: int
+    total_inactive_customers: int
 
 
 # --- Invoice Schemas ---
@@ -510,6 +613,28 @@ class PaymentResponse(PaymentBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaymentReversePayload(BaseModel):
+    reversal_reason: str
+
+    @field_validator("reversal_reason")
+    @classmethod
+    def validate_reason(cls, v: str) -> str:
+        trimmed = v.strip()
+        if not trimmed:
+            raise ValueError("Reversal reason cannot be empty")
+        if len(trimmed) > 255:
+            raise ValueError("Reversal reason must not exceed 255 characters")
+        return trimmed
+
+
+class PaymentReceiptResponse(BaseModel):
+    payment: PaymentResponse
+    allocated_invoices_count: int
+    total_allocated: str
+    advance_credit_remaining: str
+    message: str
+
+
 # --- Payment Allocation Schemas ---
 
 class PaymentAllocationBase(BaseModel):
@@ -543,3 +668,83 @@ class PaymentAllocationResponse(PaymentAllocationBase):
         return f"{val:.2f}"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class LedgerEntryResponse(BaseModel):
+    date: date
+    entry_type: str  # "charge", "payment", "reversal"
+    description: str
+    charge_amount: Decimal = Decimal("0.00")
+    payment_amount: Decimal = Decimal("0.00")
+    running_balance: Decimal = Decimal("0.00")
+
+    @field_serializer("charge_amount")
+    def serialize_charge_amount(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    @field_serializer("payment_amount")
+    def serialize_payment_amount(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    @field_serializer("running_balance")
+    def serialize_running_balance(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerFinancialHistoryResponse(BaseModel):
+    customer: CustomerResponse
+    total_invoiced: str
+    total_paid: str
+    outstanding_balance: str
+    advance_credit: str
+    invoices: list[InvoiceResponse]
+    payments: list[PaymentResponse]
+    ledger: list[LedgerEntryResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Monthly Register Schemas ---
+
+class MonthlyRegisterItem(BaseModel):
+    customer_id: int
+    display_id: str
+    customer_name: str
+    phone: str
+    box_number: str
+    area: str
+    monthly_amount: Decimal
+    amount_due: Decimal
+    amount_collected: Decimal
+    pending_amount: Decimal
+    status: str  # "paid", "partial", "unpaid"
+    is_active: bool
+
+    @field_serializer("monthly_amount")
+    def serialize_monthly_amount(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    @field_serializer("amount_due")
+    def serialize_amount_due(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    @field_serializer("amount_collected")
+    def serialize_amount_collected(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    @field_serializer("pending_amount")
+    def serialize_pending_amount(self, val: Decimal) -> str:
+        return f"{val:.2f}"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MonthlyRegisterResponse(BaseModel):
+    billing_month: str
+    total_customers: int
+    total_expected: str
+    total_collected: str
+    total_pending: str
+    items: list[MonthlyRegisterItem]

@@ -66,7 +66,10 @@ export default function BusinessSetup({ token, onSettingsSaved }: BusinessSetupP
           setContactNumber(data.contact_number || "");
           setEmail(data.email || "");
           setAddress(data.address || "");
-          setServiceAreas(data.service_areas || []);
+          const stringAreas = (data.service_areas || []).map((a) =>
+            typeof a === "string" ? a : a.name
+          );
+          setServiceAreas(stringAreas);
           setCurrencyCode(data.currency_code || "INR");
           setTimezone(data.timezone || "Asia/Kolkata");
           setDefaultMonthlyAmount(data.default_monthly_amount || "300.00");

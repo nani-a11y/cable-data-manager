@@ -10,6 +10,10 @@ from .security import hash_password
 from .routes.auth import router as auth_router, get_current_admin
 from .routes.business_settings import router as business_settings_router
 from .routes.customers import router as customers_router
+from .routes.billing import router as billing_router
+from .routes.payments import router as payments_router
+from .routes.reports import router as reports_router
+from .services.billing import run_startup_billing_catchup
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +40,9 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(business_settings_router)
 app.include_router(customers_router)
+app.include_router(billing_router)
+app.include_router(payments_router)
+app.include_router(reports_router)
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
@@ -43,12 +50,19 @@ def health(db: Session = Depends(get_db)):
     return {"status": "ok", "database": "connected"}
 
 @app.get("/api/dashboard/summary")
-def dashboard_summary(current_admin: AdminUser = Depends(get_current_admin)):
-    # Phase 1 & 2: no customer/payment data exists yet; return explicit empty state.
+def dashboard_summary(
+    db: Session = Depends(get_db),
+    current_admin: AdminUser = Depends(get_current_admin),
+):
+    from datetime import date
+    current_month = date.today().strftime("%Y-%m")
+    from .routes.reports import get_monthly_review
+    review = get_monthly_review(billing_month=current_month, db=db, current_admin=current_admin)
+    data_status = "live" if review.total_active_customers > 0 else "awaiting_customer_import"
     return {
-        "total_customers": 0,
-        "expected_collection": 0,
-        "collected": 0,
-        "outstanding": 0,
-        "data_status": "awaiting_customer_import"
+        "total_customers": review.total_active_customers,
+        "expected_collection": float(review.estimated_amount),
+        "collected": float(review.amount_collected),
+        "outstanding": float(review.pending_amount),
+        "data_status": data_status,
     }

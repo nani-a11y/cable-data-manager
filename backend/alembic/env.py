@@ -13,7 +13,7 @@ if context.config.config_file_name is not None:
     fileConfig(context.config.config_file_name)
 
 from app.database import Base
-from app.models import AdminUser  # noqa: F401 - register models in Base.metadata
+from app.models import AdminUser, BusinessSettings  # noqa: F401 - register models in Base.metadata
 from app.config import settings
 
 target_metadata = Base.metadata

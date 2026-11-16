@@ -8,6 +8,7 @@ from .database import Base, engine, SessionLocal, get_db
 from .models import AdminUser
 from .security import hash_password
 from .routes.auth import router as auth_router, get_current_admin
+from .routes.business_settings import router as business_settings_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,15 +24,16 @@ async def lifespan(app: FastAPI):
         db.close()
     yield
 
-app = FastAPI(title="Cable Manager API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Cable Manager API", version="0.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 app.include_router(auth_router)
+app.include_router(business_settings_router)
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
@@ -40,7 +42,7 @@ def health(db: Session = Depends(get_db)):
 
 @app.get("/api/dashboard/summary")
 def dashboard_summary(current_admin: AdminUser = Depends(get_current_admin)):
-    # Phase 1: no customer/payment data exists yet; return explicit empty state.
+    # Phase 1 & 2: no customer/payment data exists yet; return explicit empty state.
     return {
         "total_customers": 0,
         "expected_collection": 0,

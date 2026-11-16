@@ -1,8 +1,10 @@
 # Cable Manager
 
 Private, single-operator cable-business management application. This repository
-contains the Phase 1 engineering foundation: safe Git baseline, reproducible locked dependencies,
-Alembic migration baseline, automated pytest suite, and CI workflows.
+contains the Phase 1 engineering foundation (safe Git baseline, reproducible locked dependencies,
+Alembic migration baseline, automated pytest suite, and CI workflows) and the Phase 2
+configurable business setup (single-row database model, backend validation, Alembic migration,
+and responsive React settings interface).
 The target product, architecture decisions, audit evidence, and roadmap are documented under
 [`docs/`](docs/architecture/SYSTEM_ARCHITECTURE.md).
 
@@ -13,12 +15,27 @@ The target product, architecture decisions, audit evidence, and roadmap are docu
 - Database: PostgreSQL 16
 - Local orchestration: Docker Compose
 - Current authentication: app-level admin login with JWT and Argon2 (transitional)
-- Current data model: `admin_users` table; no customer, invoice, or payment models exist yet
+- Current data model: `admin_users` table and `business_settings` table (single-tenant business profile, billing configuration, service areas, and currency/timezone defaults)
 
 The app-level login is transitional behavior. The target architecture is one operator
 authenticated at a private remote-access gateway; there are no customer accounts,
 user registration, roles, or SaaS multi-tenancy. Do not remove the existing login until a
 gateway replacement is implemented and verified in a separately approved application change.
+
+## Business Configuration (Phase 2)
+
+Persistent single-business configuration stores operator details, service areas, and billing defaults:
+
+- **Single Record Constraint:** Enforced at the database level (`id = 1` SQL check constraint).
+- **Exact Monetary Precision:** Monthly subscription amounts use `Numeric(12, 2)` / `Decimal` (never floating-point).
+- **Billing Controls:** Billing day constrained to days 1–28 (safe for all calendar months); grace period 0–30 days.
+- **Service Areas:** Stored as structured JSON with deduplicated, trimmed area names.
+- **Localization:** Validated against IANA standard timezones (`zoneinfo`) and ISO-4217 currency codes (default `Asia/Kolkata` and `INR`).
+- **Protected Endpoints:**
+  - `GET /api/business-settings`: Retrieve active configuration (or 404 if not yet configured).
+  - `POST /api/business-settings`: Create initial configuration (returns 409 Conflict if already exists).
+  - `PUT /api/business-settings`: Replace complete configuration.
+  - `PATCH /api/business-settings`: Partially update configuration fields.
 
 ## Local Setup
 

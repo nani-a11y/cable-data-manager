@@ -1,6 +1,6 @@
 # Cable Data Manager
 
-**A modern, self-hosted customer register and payment management web application for independent local cable TV operators.**
+**A modern, self-hosted customer and payment management web application for independent local cable TV operators.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
@@ -11,79 +11,99 @@
 
 ---
 
-## 1. Product Purpose & Philosophy
+## 1. Project Introduction
 
-Independent local cable TV operators manage hundreds of residential subscribers, collecting monthly subscription fees via cash and UPI. Many operators still rely on paper registers or complex multi-tenant commercial SaaS products that charge monthly subscriptions, sell customer data, or stop working during broadband outages.
+Independent local cable TV operators in India manage hundreds of residential subscribers, collecting monthly subscription fees via cash and UPI. Many operators still rely on paper registers or complex multi-tenant commercial SaaS products that charge recurring subscription fees, expose customer records to third parties, or stop working during broadband outages.
 
-**Cable Data Manager** is built on different principles:
-- **100% Free & Open Source:** Zero subscription fees, zero license keys, zero recurring costs.
-- **Strict Data Privacy:** Zero external telemetry. Your customer records and payment history never leave your computer.
-- **Offline Reliability:** Operates completely over local LAN or localhost without requiring an active internet connection.
-- **Single-Operator Architecture:** One dedicated database per installation. No shared cloud databases or multi-tenant complexity.
-- **Financial Precision:** Exact monetary calculations using PostgreSQL `Numeric(12, 2)` (never floating-point). Overpayment advance credits, chronological Khata passbooks, and audit-controlled payment reversals.
-
----
-
-## 2. Key Features
-
-### 📋 Customer Register
-- Complete subscriber directory with search by name, phone, or STB (Set-Top Box) number.
-- Filter by service area and payment status (**Paid**, **Partial**, **Unpaid**, **Advance**).
-- Dual view: Responsive desktop data table and touch-optimized mobile customer cards (`< 700px`).
-- Quick-action buttons: 1-click payment collection, instant Khata passbook view, customer edit, and deactivation.
-
-### 💰 Financial Engine & Khata Passbook
-- Exact decimal arithmetic for all balance and transaction calculations.
-- Chronological customer passbook displaying opening balance, monthly invoices, cash/UPI receipts, payment reversals, and running net balances.
-- Advance balance credit handling: excess payments are automatically credited forward toward future monthly invoices.
-- Soft-delete audit logging: payment reversals require mandatory reason documentation and automatically recalculate customer balances.
-
-### 📅 Billing Cycle Automation
-- Automated monthly invoice generation for all active subscribers based on their assigned monthly package rate.
-- Duplicate prevention: idempotent billing engine guarantees zero accidental double-billing within the same billing cycle.
-- Grace period tracking and overdue balance calculations.
-
-### 📍 Service Areas & Business Customization
-- Configurable service delivery zones with active subscriber counts.
-- Business profile settings: operator business name, contact phone, street address, currency, and default monthly subscription rate.
-
-### 🔒 Enterprise-Grade Security
-- Password hashing using modern **Argon2id** (`t=3, m=65536, p=4`).
-- Strict production password policy: minimum 12 characters, entropy requirements, common dictionary attack rejection.
-- In-memory sliding-window IP rate limiting on login endpoints to defeat automated brute-force attacks.
-- Non-root unprivileged Docker containers (`appuser:10001` for backend, `nginx:101` for frontend).
-- Security HTTP headers: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and restrictive `Content-Security-Policy`.
+**Cable Data Manager** is designed from the ground up for independent local operators:
+- **100% Free & Open Source:** Zero monthly fees, zero per-subscriber pricing, zero feature paywalls.
+- **Strict Data Privacy:** Zero external telemetry or analytics. All subscriber profiles and financial ledgers stay strictly on your local machine.
+- **Offline / Local LAN Operation:** Runs independently over localhost or local Wi-Fi/Ethernet without requiring continuous internet access.
+- **Dedicated Single-Operator Database:** One independent database per installation. No shared cloud infrastructure.
+- **Financial Exactitude:** Full `Numeric(12, 2)` monetary precision (never floating-point). Overpayment advance credits, chronological Khata passbooks, and auditable payment reversals.
 
 ---
 
-## 3. Technology Stack
+## 2. Product Showcase
 
-| Layer | Technology | Version | Purpose |
+### Operator Dashboard
+![Operator Dashboard](docs/images/dashboard-desktop.png)
+
+### Desktop & Mobile Experience
+| Desktop Collection Register | Mobile Cards (< 700px) |
+|:---:|:---:|
+| ![Customer Register Desktop](docs/images/customer-register-desktop.png) | ![Customers Mobile](docs/images/customers-mobile.png) |
+
+| Customer Khata Passbook | Payment Collection Modal |
+|:---:|:---:|
+| ![Customer Passbook](docs/images/customer-passbook.png) | ![Payment Collection](docs/images/payment-collection.png) |
+
+| Monthly Billing Engine | Revenue Reports & Summaries |
+|:---:|:---:|
+| ![Billing Management](docs/images/billing-management.png) | ![Monthly Reports](docs/images/monthly-reports.png) |
+
+| Service Area Management | Mobile Navigation Drawer |
+|:---:|:---:|
+| ![Service Areas](docs/images/service-areas.png) | ![Mobile Navigation](docs/images/mobile-navigation.png) |
+
+---
+
+## 3. Key Features
+
+- **📋 Collection Register:**
+  - Subscriber directory searchable by customer name, mobile number, or Set-Top Box (STB) number.
+  - Payment status badges: **Paid**, **Partial**, **Unpaid**, and **Advance Credit**.
+  - Dual view: Full desktop table for office computers and responsive mobile cards (`< 700px`) for smartphones and collection agents in the field.
+- **💰 Financial Engine & Chronological Khata:**
+  - Complete chronological passbook recording opening balance, monthly invoices, cash/UPI receipts, and payment reversals.
+  - Automatic advance credit roll-forward: excess payments automatically offset subsequent monthly invoices.
+  - Reversible transactions with mandatory audit notes to track corrections transparently.
+- **📅 Billing Automation:**
+  - One-click monthly invoice generation across all active subscribers according to their configured monthly plan.
+  - Idempotent generation engine guarantees zero duplicate billing for the same subscriber in a billing cycle.
+- **📍 Service Area Segmentation:**
+  - Partition subscribers into local delivery zones (e.g., "Main Road", "Sector 4", "Gandhi Nagar").
+  - Live subscriber counts per area to simplify field collection routes.
+- **🔒 Production-Hardened Security:**
+  - **Argon2id** password hashing (`t=3, m=65536, p=4`) with strict entropy validation ($\ge 12$ characters).
+  - Sliding-window in-memory brute-force rate limiter on login endpoints.
+  - Unprivileged non-root Docker containers (`USER appuser:10001` and `USER nginx:101`).
+  - Hardened Nginx proxy with strict `Content-Security-Policy`, `X-Frame-Options: DENY`, and `X-Content-Type-Options: nosniff`.
+  - Self-hosted typography (`@fontsource/dm-sans` & `@fontsource/manrope`) ensuring zero external font CDN calls.
+- **💾 Automated Disaster Recovery:**
+  - Unattended streaming encrypted database backups via systemd timer.
+  - Asymmetric public-key encryption (GPG): public key on the host encrypts nightly dumps; private key is kept strictly offline by the business owner.
+
+---
+
+## 4. Technology Stack
+
+| Layer | Component | Version | Purpose |
 |---|---|---|---|
-| **Frontend** | React, TypeScript, Vite, Tailwind CSS | 18.3 / 6.0 | Single-Page Application (SPA) with responsive mobile UI |
-| **Fonts** | `@fontsource/dm-sans`, `@fontsource/manrope` | Latest | 100% self-hosted, offline WOFF2 typography |
-| **Backend API** | Python, FastAPI, Pydantic v2 | 3.12 / 0.115 | High-performance asynchronous REST API |
-| **Database** | PostgreSQL | 16 | ACID-compliant relational storage with `Numeric(12, 2)` precision |
-| **Migrations** | Alembic | 1.14 | Version-controlled schema migrations (0001 → 0002 → 0003) |
-| **Reverse Proxy** | Nginx Alpine | 1.27 | Hardened HTTP reverse proxy and static asset server |
-| **Packaging** | Docker & Docker Compose | v2 | Containerized, reproducible production deployment |
-| **Backup** | Bash, GNU pg_dump, GnuPG 2 | Latest | Streaming encrypted backups to external USB storage |
+| **Frontend** | React, TypeScript, Vite, Tailwind CSS | 18.3 / 6.0 | Fast, responsive single-page application |
+| **Typography** | `@fontsource/dm-sans`, `@fontsource/manrope` | Latest | 100% self-hosted, offline WOFF2 fonts |
+| **Backend API** | Python, FastAPI, Pydantic v2 | 3.12 / 0.115 | Asynchronous REST backend |
+| **Database** | PostgreSQL | 16 | ACID relational database with `Numeric(12, 2)` financial precision |
+| **Migrations** | Alembic | 1.14 | Version-controlled database schema management |
+| **Reverse Proxy** | Nginx (Alpine) | 1.27 | Hardened reverse proxy, asset caching, security headers |
+| **Packaging** | Docker Compose | v2 | Multi-container reproducible production deployment |
+| **Backup** | Bash, `pg_dump`, GnuPG 2 | Latest | Encrypted streaming backups to external USB storage |
 
 ---
 
-## 4. Architecture & Data Isolation
+## 5. System Architecture
 
 ```text
 +-------------------------------------------------------------------------+
 | Local Computer / Server (Host Machine)                                  |
 |                                                                         |
-|  Browser (Localhost or LAN)                                             |
+|  Browser (Localhost or LAN Mobile Device)                               |
 |        |                                                                |
 |        | HTTP Port 8080 (127.0.0.1 or LAN IP)                           |
 |        v                                                                |
 |  +-------------------------------------------------------------------+  |
 |  | Nginx Container (:8080)                                           |  |
-|  | - Serves React Static Bundle & Self-Hosted Fonts                  |  |
+|  | - Serves React Static Bundle & Self-Hosted Typography             |  |
 |  | - Proxies /api/* to FastAPI backend                               |  |
 |  | - Security Headers, Caching, and Request Buffering                |  |
 |  +---------------------------------+---------------------------------+  |
@@ -110,67 +130,61 @@ Independent local cable TV operators manage hundreds of residential subscribers,
 +-------------------------------------------------------------------------+
 ```
 
-- **No Public Cloud:** All services run locally inside isolated Docker containers.
-- **Zero Telemetry:** The application makes **zero outbound requests** to external servers.
-- **Port Isolation:** PostgreSQL (port 5432) and FastAPI (port 8000) are never exposed to the host network. Only Nginx is accessible on the configured host interface (`BIND_IP:8080`).
-
 ---
 
-## 5. Installation & Deployment
+## 6. Installation & Deployment
 
-We support two installation approaches:
+We support two installation paths:
 
-### Approach A: Production Docker Compose (Verified & Recommended)
-
-This approach uses standard Docker Compose and requires only basic terminal familiarity.
+### Approach A: Production Docker Compose (Recommended & Verified)
 
 #### Prerequisites
-- Operating System: Ubuntu Server/Desktop 22.04/24.04 LTS or Debian 12 (recommended).
-- Docker Engine & Docker Compose v2 installed.
-- 4 GB RAM minimum (8 GB recommended).
-- Dedicated external USB drive (for encrypted backups).
+- **Operating System:** Ubuntu Server/Desktop 22.04/24.04 LTS or Debian 12 (recommended).
+- **Docker Engine & Docker Compose v2** installed.
+- **Hardware:** 4 GB RAM minimum (8 GB recommended), 20 GB available disk space.
+- **Backup Target:** Dedicated external USB drive mounted at `/mnt/cable-manager-backups`.
 
 #### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/your-username/cable-manager.git /opt/cable-manager
-cd /opt/cable-manager
+git clone https://github.com/nani-a11y/cable-data-manager.git /opt/cable-data-manager
+cd /opt/cable-data-manager
 ```
 
 #### Step 2: Configure Environment Variables
-Copy the template and set file permissions:
+Copy the production environment template and set restricted file permissions:
 ```bash
 cp .env.example .env
 chmod 0600 .env
 ```
 
-Edit `.env` using your preferred editor (`nano .env`):
-1. Set a strong database password:
+Open `.env` in your text editor (`nano .env`) and set production values:
+1. Generate a strong database password:
    ```bash
    openssl rand -hex 24
    ```
-2. Generate a 256-bit JWT secret (minimum 32 characters required in production):
+2. Generate a 256-bit JWT secret ($\ge 32$ characters required in production):
    ```bash
    openssl rand -hex 32
    ```
 3. Set your initial administrator login email and password (`ADMIN_EMAIL` and `ADMIN_PASSWORD`).
-4. Set `APP_ENV=production`.
+4. Ensure `APP_ENV=production`.
 
-#### Step 3: Initialize Database & Run Migrations
-Start the database service and execute Alembic migrations:
+#### Step 3: Run Database Migrations
+Start the isolated PostgreSQL database service and apply Alembic migrations:
 ```bash
 # Start PostgreSQL database container
 docker compose -f docker-compose.prod.yml up -d db
 
-# Apply database migrations to head revision
+# Apply schema migrations to head revision
 docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
 ```
 
-#### Step 4: Launch the Application
+#### Step 4: Launch the Full Application
 ```bash
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Verify that all three services report healthy:
+Verify that all three services are running and healthy:
 ```bash
 docker compose -f docker-compose.prod.yml ps
 ```
@@ -185,35 +199,36 @@ http://localhost:8080
 ### Approach B: Guided Interactive Installer (`scripts/install.sh`) [Planned]
 
 > [!NOTE]
-> **Status: Planned / In Roadmap for Release v1.1.**<br/>
-> An automated, menu-driven bash installer script (`scripts/install.sh`) is currently planned to automate Docker prerequisite checks, `.env` secret generation, GPG backup key creation, and systemd service registration in a single interactive terminal walkthrough. Until Release v1.1 is tagged, operators should use **Approach A (Production Docker Compose)** above.
+> **Status: In Roadmap for Release v1.1.**<br/>
+> An automated, menu-driven bash installer script (`scripts/install.sh`) is in development to automate prerequisite detection, secret generation, GPG key creation, and systemd registration in a single interactive terminal walkthrough. For production use today, follow **Approach A (Production Docker Compose)** above.
 
 ---
 
-## 6. Daily Operating Instructions
+## 7. Operational Workflow Guide
 
-1. **Log In:** Open `http://localhost:8080`, enter your configured administrator email and password, and click **Sign in**.
-2. **Configure Business:** Navigate to **Settings** and enter your business name, contact phone, operating address, and default monthly subscription rate (e.g. ₹300).
-3. **Add Service Areas:** Navigate to **Service Areas** and create delivery zones (e.g. "Main Market", "Sector 4").
-4. **Register Customers:** In **Collection Register**, click **New Customer**, fill in their name, phone, set-top box number, and assigned service area.
-5. **Collect Payments:** On any customer row, click **Collect**, enter the cash or UPI amount received, select the payment mode, and submit. The passbook balance updates instantly.
-6. **Generate Monthly Invoices:** On the 1st of each month, navigate to **Billing Management** and click **Generate Monthly Invoices**. Invoices are created for all active subscribers with zero duplicate billing.
+1. **Log In:** Navigate to `http://localhost:8080`, enter your configured administrator credentials, and log in.
+2. **Initial Business Profile:** Open **Settings** and configure your business name, contact phone, street address, currency, and default monthly rate (e.g. ₹300).
+3. **Configure Service Areas:** Open **Service Areas** and create delivery zones (e.g. "North Sector", "Main Market").
+4. **Register Customers:** In **Collection Register**, click **New Customer**, fill in their subscriber details, STB number, and assigned area.
+5. **Collect Payments:** On any customer row or card, click **Collect**, choose payment mode (Cash or UPI), enter amount, and submit. The Khata balance updates immediately.
+6. **Monthly Billing Cycle:** On the 1st of each month, navigate to **Billing Management** and click **Generate Monthly Invoices** to bill all active subscribers idempotently.
+7. **Review Revenue:** Navigate to **Monthly Summary** to audit total collections, outstanding dues, and collection percentages.
 
 ---
 
-## 7. Password Recovery CLI
+## 8. Administrative Password Reset CLI
 
-If the administrator password is forgotten, it can be reset directly from the host terminal without plaintext logging:
+If the administrator password is ever forgotten, it can be reset safely from the host terminal without plaintext logging or database inspection:
 
 ```bash
 docker compose -f docker-compose.prod.yml run --rm backend python -m app.cli reset-admin-password --email your-email@example.com
 ```
 
-The CLI prompts interactively with masked input and enforces the production password policy ($\ge 12$ characters, entropy, dictionary check).
+The CLI prompts interactively with masked input, enforces production password policies, and updates the hash transactionally.
 
 ---
 
-## 8. Backup & Disaster Recovery
+## 9. Backup & Disaster Recovery
 
 Nightly backups are automated via systemd timer and GPG public-key stream encryption:
 - Backups are written directly to `/mnt/cable-manager-backups` (dedicated external USB SSD).
@@ -227,28 +242,30 @@ Nightly backups are automated via systemd timer and GPG public-key stream encryp
 
 ---
 
-## 9. Development & Testing
+## 10. Local Development & Testing
 
 To run the application locally in development mode:
 ```bash
-# Backend virtual environment
+# 1. Backend Setup
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.lock
 
-# Run pytest regression suite
+# Run Pytest Regression Suite (100 tests)
 pytest tests -v
 
-# Frontend development server
+# 2. Frontend Setup
 cd ../frontend
 npm ci
 npm run dev
 ```
 
+The development server runs on `http://127.0.0.1:5173` with hot-module reloading.
+
 ---
 
-## 10. Project Structure
+## 11. Project Directory Structure
 
 ```text
 ├── backend/
@@ -278,6 +295,7 @@ npm run dev
 ├── docs/
 │   ├── architecture/           # System, database, and security specifications
 │   ├── deployment/             # Step-by-step production installation runbooks
+│   ├── images/                 # Real application screenshots for repository gallery
 │   └── quality/                # Sprint verification and audit reports
 ├── scripts/
 │   ├── backup/                 # GPG backup, restore, retention, and systemd units
@@ -288,12 +306,12 @@ npm run dev
 
 ---
 
-## 11. Contributing
+## 12. Contribution Guidelines
 
-Contributions are welcome! Please open an issue to discuss proposed changes before submitting pull requests. All submissions must pass automated pytest regression tests and `git diff --check`.
+Contributions are welcome! Please open an issue to discuss proposed enhancements before submitting pull requests. All pull requests must pass automated pytest regression tests (`pytest tests`) and code formatting checks (`git diff --check`).
 
 ---
 
-## 12. License
+## 13. License
 
 This project is open-source software licensed under the terms of the [MIT License](LICENSE).

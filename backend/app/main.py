@@ -17,7 +17,11 @@ from .services.billing import run_startup_billing_catchup
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    # In development and testing, automatically ensure schema exists.
+    # In production, schema must be managed explicitly via Alembic migrations.
+    if settings.app_env != "production":
+        Base.metadata.create_all(bind=engine)
+
     db = SessionLocal()
     try:
         email = settings.admin_email.lower()
@@ -25,6 +29,14 @@ async def lifespan(app: FastAPI):
         if not existing:
             db.add(AdminUser(email=email, password_hash=hash_password(settings.admin_password)))
             db.commit()
+    except Exception:
+        db.rollback()
+        if settings.app_env == "production":
+            import logging
+            logging.getLogger("uvicorn.error").warning(
+                "Production startup: unable to query admin_users table. "
+                "Ensure database migrations have been executed via 'alembic upgrade head'."
+            )
     finally:
         db.close()
     yield

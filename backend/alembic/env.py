@@ -31,7 +31,11 @@ def get_url() -> str:
         try:
             url = settings.database_url
         except Exception:
-            url = "postgresql+psycopg://cable_admin:password@localhost:5432/cable_manager"
+            url = None
+    if not url or "cable_admin:password@localhost:5432" in url:
+        raise RuntimeError(
+            "DATABASE_URL is not configured. A valid database connection URL is required to run migrations."
+        )
     return url
 
 def run_migrations_offline() -> None:

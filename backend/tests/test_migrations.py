@@ -29,6 +29,10 @@ def test_alembic_upgrade_and_downgrade_disposable():
             tables = inspector.get_table_names()
             assert "admin_users" in tables
             assert "business_settings" in tables
+            assert "customers" in tables
+            assert "invoices" in tables
+            assert "payments" in tables
+            assert "payment_allocations" in tables
             assert "alembic_version" in tables
 
             # Verify admin_users columns
@@ -44,18 +48,40 @@ def test_alembic_upgrade_and_downgrade_disposable():
                 "late_payment_policy", "created_at", "updated_at"
             }.issubset(bs_cols)
 
-            # 2. Downgrade to 0001_initial_admin_users
+            # Verify customers columns
+            cust_cols = {col["name"] for col in inspector.get_columns("customers")}
+            assert {"id", "display_id", "name", "phone", "box_number", "area", "monthly_amount", "is_active"}.issubset(cust_cols)
+
+            # 2. Downgrade to 0002_business_settings
+            command.downgrade(alembic_cfg, "0002_business_settings")
+            inspector = sa.inspect(engine)
+            tables_p2 = inspector.get_table_names()
+            assert "customers" not in tables_p2
+            assert "invoices" not in tables_p2
+            assert "payments" not in tables_p2
+            assert "payment_allocations" not in tables_p2
+            assert "business_settings" in tables_p2
+            assert "admin_users" in tables_p2
+
+            # 3. Downgrade to 0001_initial_admin_users
             command.downgrade(alembic_cfg, "0001_initial_admin_users")
             inspector = sa.inspect(engine)
             tables_mid = inspector.get_table_names()
             assert "business_settings" not in tables_mid
             assert "admin_users" in tables_mid
 
-            # 3. Downgrade to base
+            # 4. Downgrade to base
             command.downgrade(alembic_cfg, "base")
             inspector = sa.inspect(engine)
             tables_after = inspector.get_table_names()
             assert "admin_users" not in tables_after
+
+            # 5. Re-upgrade to head
+            command.upgrade(alembic_cfg, "head")
+            inspector = sa.inspect(engine)
+            tables_reup = inspector.get_table_names()
+            assert "customers" in tables_reup
+            assert "invoices" in tables_reup
 
             engine.dispose()
         finally:

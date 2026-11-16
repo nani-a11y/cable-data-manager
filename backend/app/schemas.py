@@ -260,7 +260,7 @@ class CustomerBase(BaseModel):
     phone: str
     box_number: str
     area: str
-    monthly_amount: Decimal
+    monthly_amount: Decimal | None = None
 
     @field_validator("name")
     @classmethod
@@ -307,7 +307,9 @@ class CustomerBase(BaseModel):
 
     @field_validator("monthly_amount")
     @classmethod
-    def validate_monthly_amount(cls, v: Decimal) -> Decimal:
+    def validate_monthly_amount(cls, v: Decimal | None) -> Decimal | None:
+        if v is None:
+            return None
         if v <= Decimal("0"):
             raise ValueError("Monthly amount must be greater than 0")
         if v > Decimal("9999999999.99"):
@@ -366,9 +368,14 @@ class CustomerUpdate(BaseModel):
         return None
 
 
-class CustomerResponse(CustomerBase):
+class CustomerResponse(BaseModel):
     id: int
     display_id: str
+    name: str
+    phone: str
+    box_number: str
+    area: str
+    monthly_amount: Decimal
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -376,6 +383,16 @@ class CustomerResponse(CustomerBase):
     @field_serializer("monthly_amount")
     def serialize_monthly_amount(self, val: Decimal) -> str:
         return f"{val:.2f}"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CustomerPagination(BaseModel):
+    items: list[CustomerResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
     model_config = ConfigDict(from_attributes=True)
 

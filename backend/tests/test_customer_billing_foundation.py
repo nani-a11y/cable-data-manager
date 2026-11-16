@@ -116,7 +116,7 @@ def test_01_migration_upgrade_to_head(alembic_cfg, pg_engine):
     assert {"id", "payment_id", "invoice_id", "allocated_amount", "created_at"}.issubset(alloc_cols)
 
 
-def test_02_alembic_schema_zero_drift(alembic_cfg):
+def test_02_alembic_schema_zero_drift(alembic_cfg, pg_engine):
     """2. Alembic schema check with zero drift."""
     # command.check raises CommandError if drift is detected
     command.check(alembic_cfg)

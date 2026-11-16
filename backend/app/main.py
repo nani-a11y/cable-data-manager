@@ -9,6 +9,7 @@ from .models import AdminUser
 from .security import hash_password
 from .routes.auth import router as auth_router, get_current_admin
 from .routes.business_settings import router as business_settings_router
+from .routes.customers import router as customers_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,6 +35,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(business_settings_router)
+app.include_router(customers_router)
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):

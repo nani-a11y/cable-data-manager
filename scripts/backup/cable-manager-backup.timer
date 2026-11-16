@@ -1,0 +1,17 @@
+[Unit]
+Description=Daily Automated Backup Timer for Cable Data Manager
+Documentation=https://github.com/local-cable/cable-manager
+After=time-sync.target
+
+[Timer]
+# Run once daily at 02:00 local system time
+OnCalendar=*-*-* 02:00:00
+
+# Persistent ensures a missed run (e.g. machine powered off) triggers upon next startup
+Persistent=true
+
+# Add a 5-minute random delay jitter to prevent simultaneous disk spikes
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
